@@ -11,11 +11,11 @@ import contextlib
 import gps
 
 # lat long long_radius north east angle_true angle_magnetic
-Output_filename = '/tmp/gps_direction.out'
+Output_filename = '/var/nav/gps_direction.out'
 
 Earth_radius = 6371000
 
-def run(filename='/tmp/gps_waypoints', variation=2, threshold=5):
+def run(filename='/var/nav/gps_waypoints', variation=2, threshold=5):
     r'''
 
     variation > 0 for W, < 0 for E.
@@ -79,7 +79,7 @@ def usage():
     print >> sys.stderr, \
           "       variation is > 0 for W, < 0 for E"
     print >> sys.stderr, \
-          "       defaults: /tmp/gps_waypoints 2 5"
+          "       defaults: /var/nav/gps_waypoints 2 5"
     sys.exit(2)
 
 if __name__ == "__main__":
