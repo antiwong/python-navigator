@@ -35,6 +35,9 @@ def navigate_to(target_lat, target_long, session, outfile, variation,
     long_radius = Earth_radius * math.cos(math.radians(target_lat))
     #print "long_radius", long_radius
 
+    print >> outfile, "lat, long, long_radius, " \
+                      "north, east, angle_true, angle_magnetic"
+
     while True:
         session.query('o')
 
@@ -51,7 +54,10 @@ def navigate_to(target_lat, target_long, session, outfile, variation,
         #print 'angle, true', angle_true
         #print 'angle, magnetic', angle_magnetic
 
-        if max(abs(north), abs(east)) < threshold: break
+        if max(abs(north), abs(east)) < threshold:
+            print "waypoint", target_lat, target_long, "reached, north", \
+                  north, "east", east
+            break
 
         print >> outfile, lat, long, long_radius, \
                           north, east, angle_true, angle_magnetic
@@ -83,7 +89,9 @@ def usage():
     sys.exit(2)
 
 if __name__ == "__main__":
-    if len(sys.argv) > 4 or sys.argv[1].startswith(('-h', '--h')): usage()
+    if len(sys.argv) > 4 or \
+       len(sys.argv) > 1 and sys.argv[1].startswith(('-h', '--h')):
+        usage()
     if len(sys.argv) == 4:
         run(sys.argv[1], float(sys.argv[2]), float(sys.argv[3]))
     elif len(sys.argv) == 3:
