@@ -126,11 +126,11 @@ class pololu(object):
         self.direction = direction
 
     def set_range_finder(self, rf_direction):
-        self.write_servo(5, rf_direction)
+        self.write_servo(5, -rf_direction)
         self.rf_direction = rf_direction
 
     def read_distance(self):
-        self.distance = self.read_num(2)
+        self.distance = 600 - self.read_num(2)
         return self.distance
 
     def read_compass(self):

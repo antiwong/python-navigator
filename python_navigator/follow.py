@@ -12,6 +12,7 @@ import time
 import ConfigParser
 import logging, logging.config
 import control
+import angle
 
 Config = ConfigParser.SafeConfigParser()
 Config.read('/var/nav/nav.conf')
@@ -102,6 +103,8 @@ def run(duration=None, power_level1=None, power_level2=None, fudge=None):
                 # wait for first heading:
                 while g.read() is None: pass
 
+                ctl.set_range_finder(0)     # look straight ahead
+
                 # preload compass values to get averaging going...
                 for i in range(cp.maxlen):
                     cp.read()
@@ -117,6 +120,8 @@ def run(duration=None, power_level1=None, power_level2=None, fudge=None):
                     start = time.time()
                     iterations = 0
 
+                    did_wall = False
+
                     #print "obstacle_dist actual_heading correction " \
                     #      "processing_time"
                     while time.time() - start < duration:
@@ -125,11 +130,13 @@ def run(duration=None, power_level1=None, power_level2=None, fudge=None):
                         obstacle_dist = ctl.read_distance()
 
                         # close obstacle detection
-                        if obstacle_dist > 200:
+                        if not did_wall and obstacle_dist < 500:
+                            print >> sys.stderr, "going to wall_following"
                             Logger.info("obstacle encountered at distance %d",
                                         obstacle_dist)
                             wall_follow(cp, ctl, power_levels, target_heading,
-                                        1, 200)
+                                        start, duration, 1, 200)
+                            did_wall = True
 
                         actual_heading = cp.read()
                         target_heading = g.read()
@@ -170,71 +177,86 @@ def run(duration=None, power_level1=None, power_level2=None, fudge=None):
                     time.sleep(1)
                     ctl.set_power(0)
     except Exception, e:
+        print >> sys.stderr, "got exception"
         Logger.exception("%s: %s", e.__class__.__name__, e)
         raise
 
-def wall_follow(cp, ctl, power_levels, target_heading, side=0, distance=200):
+def wall_follow(cp, ctl, power_levels, target_heading, start, duration,
+                side=0, distance=200):
     # Stop the car, reposition vehicle at specified distance, use ranger/servo
     # to determine best way to go around obstacle (if side=0), turn the car 90
     # degrees, advance while controlling steering to maintain distance to
     # wall/obstacle.  Exit loop when compass heading is same or close to target
     # heading.
+    ctl.set_power(-100)
+    time.sleep(1)
     ctl.set_power(0)
-    time.sleep(2)
+    time.sleep(1)
     if side == 0:
-        ctl.set_range_finder(-100)      # look to the left
+        ctl.set_range_finder(-250)     # look to the left
         time.sleep(0.5)
         left_dist = ctl.read_distance()
-        ctl.set_range_finder(100)      # look to the right
+        ctl.set_range_finder(250)      # look to the right
         time.sleep(0.5)
         right_dist = ctl.read_distance()
         if right_dist > left_dist:
-            side = 1
+            side = 1    # obstacle on left
         else:
-            side = -1
+            side = -1   # obstacle on right
+        Logger.debug("left_dist %d, right_dist %d, side %d",
+                     left_dist, right_dist, side)
     iterations = 0
     actual_heading = cp.read()
-    half_wall_heading = actual_heading - 45 * side
-    wall_heading = actual_heading - 90 * side
+    half_new_heading = actual_heading + 45 * side
+    new_heading = actual_heading + 90 * side
+    Logger.debug("actual_heading %.0f, half_new_heading %.0f, new_heading %.0f",
+                 actual_heading, half_new_heading, new_heading)
+    ctl.set_steering(-500 * side)
+    time.sleep(0.5)
+    while angle.less(actual_heading * side, half_new_heading * side):
+        ctl.set_power(-2 * power_levels[iterations & 1])
+        iterations += 1
+        time.sleep(0.1)
+        actual_heading = cp.read()
+    Logger.debug("after backing, actual_heading is %.0f", actual_heading)
+    ctl.set_power(0)
     ctl.set_steering(500 * side)
     time.sleep(0.5)
-    while actual_heading * side > half_wall_heading * side:
+    while angle.less(actual_heading * side, new_heading * side):
         ctl.set_power(power_levels[iterations & 1])
         iterations += 1
         time.sleep(0.1)
         actual_heading = cp.read()
     ctl.set_power(0)
-    ctl.set_steering(-500 * side)
-    time.sleep(0.5)
-    while actual_heading * side > wall_heading * side:
-        ctl.set_power(-1 * power_levels[iterations & 1])
-        iterations += 1
-        time.sleep(0.1)
-        actual_heading = cp.read()
-    ctl.set_power(0)
-    ctl.set_range_finder(side * 500)
+    Logger.debug("after going forward, actual_heading is %.0f", actual_heading)
+    Logger.debug("target_heading %.0f", target_heading)
+    ctl.set_range_finder(-500 * side)
+    ctl.set_steering(-100 * side)
     time.sleep(2)
     # at this point, the car should be with its side facing the wall
     while time.time() - start < duration:
         ctl.set_power(power_levels[iterations & 1])
         side_dist = ctl.read_distance()
-        if side_dist > distance + 20:   # too close
+        if side_dist < distance - 20:   # too close
             ctl.set_steering(100 * side)
-        elif side_dist < distance - 10: # too far
+        elif side_dist > distance + 10: # too far
             ctl.set_steering(-100 * side)
         # if car went 20 past target angle
-        if actual_heading - target_heading < 20 * side:
+        if angle.less(target_heading - actual_heading, 20 * side):
+            Logger.info("wall_following done, actual_heading is %.0f",
+                        actual_heading)
             break
         iterations += 1
         time.sleep(0.1)
         actual_heading = cp.read()
-
+    else:
+        Logger.info("wall_following timed out, actual_heading is %.0f",
+                    actual_heading)
+    ctl.set_range_finder(0)     # look straight ahead
 
 def usage():
     print >> sys.stderr, \
           "usage: follow.py [duration [power_level1 [power_level2 [steering_fudge]]]]"
-    print >> sys.stderr, \
-          "       defaults: 20 30 25 5.0"
     sys.exit(2)
 
 if __name__ == "__main__":
