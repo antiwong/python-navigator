@@ -8,7 +8,7 @@ import sys
 import time
 import math
 import contextlib
-import logging, logging.config
+import logging, logging.config, logging.handlers
 import ConfigParser
 import gps
 
@@ -24,7 +24,7 @@ Config.read('/var/nav/nav.conf')
 logging.config.fileConfig(Config.get('gps_nav', 'logging_conf'))
 Logger = logging.getLogger('gps_nav')
 
-def run(filename=None, variation=None, threshold=None):
+def run(waypoint_filename=None, variation=None, threshold=None):
     r'''
 
     variation > 0 for W, < 0 for E.
@@ -38,8 +38,7 @@ def run(filename=None, variation=None, threshold=None):
         threshold = Config.getfloat('gps_nav', 'threshold')
     Logger.info("started waypoints: %r, outputting to: %r",
                 waypoint_filename, output_filename)
-    Logger.info("variation=%r, threshold=%r",
-                filename, variation, threshold)
+    Logger.info("variation=%r, threshold=%r", variation, threshold)
     try:
         with open(waypoint_filename) as waypoints:
             with contextlib.closing(gps.gps()) as session:
