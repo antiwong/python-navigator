@@ -11,7 +11,7 @@ import stat
 import time
 import control
 
-Input_filename = '/tmp/gps_direction.out'
+Input_filename = '/var/nav/gps_direction.out'
 
 class gps(object):
     r'''A context manager to read the target heading from the gps file.
