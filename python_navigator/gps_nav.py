@@ -16,20 +16,47 @@ def run(target_lat, target_long, variation):
 
     variation > 0 for W, < 0 for E.
     '''
-    Session = gps.gps()
-    print dir(Session)
 
+    # Radius of the circle of longitude at the target latitude.
     long_radius = Earth_radius * math.cos(math.radians(target_lat))
-    while True:
-        Session.query('o')
-        lat = Session.fix.latitude
-        long = Session.fix.longitude
-        print 'lat', lat, 'long', long
-        north = Earth_radius * math.radians(lat - target_lat)
-        print 'north', north
-        east = long_radius * math.radians(long - target_long)
-        print 'east', east
-        angle_true = math.degrees(math.atan2(east, north))
-        print 'angle, true', angle_true
-        print 'angle, magnetic', angle_true + variation
-        time.sleep(1)
+    #print "long_radius", long_radius
+
+    with contextlib.nested(contextlib.closing(gps.gps()),
+                           contextlib.closing(open(Output_filename, 'wt', 1))) \
+      as (session, outfile):
+
+        while True:
+            session.query('o')
+
+            lat = session.fix.latitude
+            long = session.fix.longitude
+            #print 'lat', lat, 'long', long
+
+            north, east, angle_true, angle_magnetic = \
+              calc_angle(target_lat, target_long, variation, long_radius,
+                         lat, long)
+
+            #print 'north', north
+            #print 'east', east
+            #print 'angle, true', angle_true
+            #print 'angle, magnetic', angle_magnetic
+
+            print >> outfile, lat, long, long_radius, \
+                              north, east, angle_true, angle_magnetic
+
+            time.sleep(1)
+
+def calc_angle(target_lat, target_long, variation, long_radius, lat, long):
+    # distance in meters north to target (< 0 if target is south)
+    north = Earth_radius * math.radians(target_lat - lat)
+
+    # distance in meters east to target (< 0 if target is west)
+    east = long_radius * math.radians(target_long - long)
+
+    # True heading to target. -180 to 180
+    angle_true = math.degrees(math.atan2(east, north))
+
+    # Magnetic heading to target. -180 to 180
+    angle_magnetic = angle_true + variation
+
+    return north, east, angle_true, angle_magnetic
