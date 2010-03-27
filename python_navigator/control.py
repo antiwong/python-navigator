@@ -89,6 +89,9 @@ class pololu(object):
             writing: 0x2d
             flush
         '''
+        n = int(round(n))
+        if n < -500: n = -500
+        elif n > 500: n = 500
         b2, b1 = divmod(n + 1500, 32)   # 32 is 128/4, 128 is 7 bits
         self.write(0x84, servo, b1 << 2, b2)
 
@@ -109,11 +112,11 @@ class pololu(object):
         return ord(data[0]) + (ord(data[1]) << 8)
 
     def set_power(self, level):
-        self.write_servo(3, level)
+        self.write_servo(3, -level)
         self.power_level = level
 
     def set_steering(self, direction):
-        self.write_servo(4, direction)
+        self.write_servo(4, -direction)
         self.direction = direction
 
     def set_range_finder(self, rf_direction):
@@ -127,8 +130,9 @@ class pololu(object):
     def read_compass(self):
         east = self.read_num(0) - Compass_E_midpoint
         north = self.read_num(1) - Compass_N_midpoint
-        print "port 0 (east) = %d, port 1 (north) = %d" % (east, north)
+        #print "port 0 (east) = %d, port 1 (north) = %d" % (east, north)
         self.heading = math.degrees(math.atan2(east, north))
+        #print "compass heading", self.heading
         return self.heading
 
 if __name__ == "__main__":
