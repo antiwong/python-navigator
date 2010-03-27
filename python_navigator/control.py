@@ -3,8 +3,8 @@
 import serial
 import math
 
-Compass_X_reference = 512
-Compass_Y_reference = 512
+Compass_N_midpoint = 575
+Compass_E_midpoint = 575
 
 class pololu(object):
     def __init__(self, device='/dev/ttyS3', baud=9600, timeout=0, rtscts=0,
@@ -32,6 +32,15 @@ class pololu(object):
             self.ser = serial.Serial(device, baud, timeout=timeout,
                                      rtscts=rtscts)
             self.write(0xAA) # calibrate pololu serial parameters (baud, etc)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+    def close(self):
+        self.ser.close()
 
     def write(self, *args):
         r'''Writes a series of numbers.
@@ -116,10 +125,10 @@ class pololu(object):
         return self.distance
 
     def read_compass(self):
-        x = self.read_num(0) - Compass_X_reference
-        y = self.read_num(1) - Compass_Y_reference
-        print "port 0 = %d, port 1 = %d" % (x, y)
-        self.heading = math.degrees(math.atan2(y, x))
+        east = self.read_num(0) - Compass_E_midpoint
+        north = self.read_num(1) - Compass_N_midpoint
+        print "port 0 (east) = %d, port 1 (north) = %d" % (east, north)
+        self.heading = math.degrees(math.atan2(east, north))
         return self.heading
 
 if __name__ == "__main__":
