@@ -7,6 +7,7 @@ import math
 import contextlib
 import gps
 
+# lat long long_radius north east angle_true angle_magnetic
 Output_filename = '/tmp/gps_direction.out'
 
 Earth_radius = 6371000
