@@ -1,6 +1,10 @@
 # control.py
 
 import serial
+import math
+
+Compass_X_reference = 512
+Compass_Y_reference = 512
 
 class pololu(object):
     def __init__(self, device='/dev/ttyS3', baud=9600, timeout=0, rtscts=0,
@@ -63,13 +67,13 @@ class pololu(object):
             writing: 0x74
             writing: 0x2e
             flush
-            >>> s.write_servo(0xFF, 32)
+            >>> s.write_servo(0xff, 32)
             writing: 0x84
             writing: 0xff
             writing: 0x70
             writing: 0x2f
             flush
-            >>> s.write_servo(0xFF, -32)
+            >>> s.write_servo(0xff, -32)
             writing: 0x84
             writing: 0xff
             writing: 0x70
@@ -79,35 +83,44 @@ class pololu(object):
         b2, b1 = divmod(n + 1500, 32)   # 32 is 128/4, 128 is 7 bits
         self.write(0x84, servo, b1 << 2, b2)
 
-    def read_num(self):
-        r'''Reads 2 bytes as little-endian integer.
+    def read_num(self, port):
+        r'''Reads 2 bytes as little-endian integer from port.
 
             >>> s = pololu(debug=True)
             >>> s.ser.take(1, 2)
-            >>> s.read_num()
+            >>> s.read_num(0x11)
+            writing: 0x90
+            writing: 0x11
+            flush
             513
         '''
-        ans = 0
+        self.write(0x90, port)
         data = self.ser.read(2)
         while len(data) < 2: data += self.ser.read(2 - len(data))
         return ord(data[0]) + (ord(data[1]) << 8)
 
     def set_power(self, level):
-        self.write_servo(0x03, level)
+        self.write_servo(3, level)
         self.power_level = level
 
     def set_steering(self, direction):
-        self.write_servo(0x04, direction)
+        self.write_servo(4, direction)
         self.direction = direction
 
     def set_range_finder(self, rf_direction):
-        self.write_servo(0x05, rf_direction)
+        self.write_servo(5, rf_direction)
         self.rf_direction = rf_direction
 
     def read_distance(self):
-        self.write(0x90, 0x02)
-        self.distance = self.read_le(2)
+        self.distance = self.read_num(2)
         return self.distance
+
+    def read_compass(self):
+        x = self.read_num(0) - Compass_X_reference
+        y = self.read_num(1) - Compass_Y_reference
+        print "port 0 = %d, port 1 = %d" % (x, y)
+        self.heading = math.degrees(math.atan2(y, x))
+        return self.heading
 
 if __name__ == "__main__":
     import doctest
