@@ -12,7 +12,7 @@ Output_filename = '/tmp/gps_direction.out'
 
 Earth_radius = 6371000
 
-def run(target_lat, target_long, variation):
+def run(target_lat=28.039072, target_long=-82.409922, variation=2):
     r'''
 
     variation > 0 for W, < 0 for E.
