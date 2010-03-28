@@ -1,7 +1,10 @@
+#!/usr/bin/python
+
 # gps_nav.py
 
 from __future__ import with_statement
 
+import sys
 import time
 import math
 import contextlib
@@ -61,3 +64,16 @@ def calc_angle(target_lat, target_long, variation, long_radius, lat, long):
     angle_magnetic = angle_true + variation
 
     return north, east, angle_true, angle_magnetic
+
+def usage():
+    print >> sys.stderr, \
+          "usage: gps_nav.py [target_lat [target_long [variation]]]"
+    print >> sys.stderr, \
+          "       variation is > 0 for W, < 0 for E"
+    print >> sys.stderr, \
+          "       defaults: 28.039072 -82.409922 2"
+    sys.exit(2)
+
+if __name__ == "__main__":
+    if sys.argv[1].startswith(('-h', '--h')): usage()
+    run(*(float(arg) for arg in sys.argv[1:]))
