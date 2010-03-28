@@ -1,8 +1,11 @@
+#!/usr/bin/python
+
 # follow.py
 
 from __future__ import with_statement
 from __future__ import division
 
+import sys
 import os
 import stat
 import time
@@ -120,3 +123,13 @@ def run(power_level=30, duration=20, fudge=10.0):
                 time.sleep(1)
                 ctl.set_power(0)
 
+def usage():
+    print >> sys.stderr, \
+          "usage: follow.py [power_level [duration [steering_fudge]]]"
+    print >> sys.stderr, \
+          "       defaults: 30 20 10.0"
+    sys.exit(2)
+
+if __name__ == "__main__":
+    if len(sys.argv) > 4 or sys.argv[1].startswith(('-h', '--h')): usage()
+    run(*(float(arg) for arg in sys.argv[1:]))

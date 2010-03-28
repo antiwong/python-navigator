@@ -75,5 +75,5 @@ def usage():
     sys.exit(2)
 
 if __name__ == "__main__":
-    if sys.argv[1].startswith(('-h', '--h')): usage()
+    if len(sys.argv) > 4 or sys.argv[1].startswith(('-h', '--h')): usage()
     run(*(float(arg) for arg in sys.argv[1:]))
