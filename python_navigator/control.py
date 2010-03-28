@@ -108,7 +108,13 @@ class pololu(object):
         '''
         self.write(0x90, port)
         data = self.ser.read(2)
-        while len(data) < 2: data += self.ser.read(2 - len(data))
+        if len(data) != 2:
+            print "port", port, "short read, wanted 2 bytes, got", len(data), \
+                  "bytes"
+            if len(data) == 1:
+                return ord(data[0])
+            return 0
+        #while len(data) < 2: data += self.ser.read(2 - len(data))
         return ord(data[0]) + (ord(data[1]) << 8)
 
     def set_power(self, level):

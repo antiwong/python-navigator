@@ -49,7 +49,7 @@ class compass(object):
 
     def read(self):
         compass = self.ctl.read_compass()
-        print "compass:", compass
+        print "compass: %.2f" % compass
         self.queue.insert(0, compass)
         if len(self.queue) > self.maxlen: del self.queue[self.maxlen:]
         ans = sum((fudge * data)
@@ -57,8 +57,9 @@ class compass(object):
                / sum(self.scale_factors[:self.maxlen])
         return ans
 
-def run(fudge=10.0, duration=20):
-    with control.pololu() as ctl:
+def run(power_level=30, duration=20, fudge=10.0):
+    # power_level 25 doesn't go, 30 does.
+    with control.pololu(timeout=1) as ctl:
         cp = compass(ctl)
         with gps() as g:
             # wait for first heading:
@@ -70,32 +71,41 @@ def run(fudge=10.0, duration=20):
                 time.sleep(0.1)
 
             # Go!
-            start = time.time()
-            ctl.set_power(64)
-            time.sleep(0.5)
+            try:
+                ctl.set_power(power_level)
+                time.sleep(0.5)
+                start = time.time()
 
-            while time.time() - start < duration:
-                obstacle_dist = ctl.read_distance()
-                actual_heading = cp.read()
-                print "actual_heading", actual_heading
-                target_heading = g.read()
-                print "target_heading", target_heading
+                while time.time() - start < duration:
+                    start_tenth = time.time()
+                    obstacle_dist = ctl.read_distance()
+                    actual_heading = cp.read()
+                    print "  actual_heading %.2f" % actual_heading
+                    target_heading = g.read()
+                    #print "  target_heading %.2f" % target_heading
 
-                # positive is right turn
-                correction = target_heading - actual_heading
+                    # positive is right turn
+                    correction = target_heading - actual_heading
 
-                print "correction1", correction
+                    #print "  correction1 %.2f" % correction
 
-                # correct for small differences around +/-180:
-                if abs(correction) > 180.0:
-                    if correction > 0.0: correction -= 360.0
-                    else: correction += 360.0
+                    # correct for small differences around +/-180:
+                    if abs(correction) > 180.0:
+                        if correction > 0.0: correction -= 360.0
+                        else: correction += 360.0
 
-                print "correction2", correction
+                    print "       correction %.2f" % correction
 
-                ctl.set_steering(correction * fudge)
+                    ctl.set_steering(correction * fudge)
 
-                time.sleep(0.1)
+                    print "  elapsed time %.2f" % (time.time() - start_tenth)
 
-            # Stop!
-            ctl.set_power(0)
+                    time.sleep(0.1)
+                print "total time", time.time() - start
+
+            finally:
+                # Stop!
+                ctl.set_power(0)
+                time.sleep(1)
+                ctl.set_power(0)
+
