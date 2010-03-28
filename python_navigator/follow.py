@@ -4,6 +4,7 @@ from __future__ import with_statement
 from __future__ import division
 
 import os
+import stat
 import time
 import control
 
@@ -21,21 +22,31 @@ class gps(object):
     '''
     def __init__(self):
         self.f = open(Input_filename)
-        self.f.seek(0, os.SEEK_END)
+        size = os.fstat(self.f.fileno())[stat.ST_SIZE]
+        if size > 120:
+            self.f.seek(-120, os.SEEK_END)      # 120 is just a guess,
+                                                # trying to backup to about
+                                                # halfway through the next to
+                                                # last line.
+            self.f.readline()   # This will be a partial line, so discard it.
+                                # But it gets us aligned to the start of the
+                                # (hopefully) last line.
         self.last_target = None
 
     def __enter__(self):
         return self
 
     def __exit__(self, type, value, traceback):
+        self.close()
+
+    def close(self):
         self.f.close()
 
     def read(self):
         line = self.f.readline()
         if line:
-            lat, long, long_radius, north, east, angle_true, angle_magnetic = \
-              line.split()
-            self.last_target = float(angle_magnetic)
+            #lat, long, long_radius, north, east, angle_true, angle_magnetic
+            self.last_target = float(line.split()[-1])
         return self.last_target
 
 class compass(object):
