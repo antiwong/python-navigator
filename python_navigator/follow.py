@@ -71,7 +71,7 @@ class compass(object):
                / sum(self.scale_factors[:self.maxlen])
         return ans
 
-def run(power_level=30, duration=20, fudge=10.0):
+def run(power_level1=30, power_level2=20, duration=20, fudge=10.0):
     # power_level 25 doesn't go, 30 does.
     with control.pololu(timeout=1) as ctl:
         cp = compass(ctl)
@@ -86,36 +86,39 @@ def run(power_level=30, duration=20, fudge=10.0):
 
             # Go!
             try:
-                ctl.set_power(power_level)
-                time.sleep(0.5)
+                ctl.set_power(power_level1)
+                time.sleep(1.0)
+                ctl.set_power(power_level2)
                 start = time.time()
+                iterations = 0
 
                 while time.time() - start < duration:
                     start_tenth = time.time()
                     obstacle_dist = ctl.read_distance()
                     actual_heading = cp.read()
-                    print "  actual_heading %.2f" % actual_heading
                     target_heading = g.read()
-                    #print "  target_heading %.2f" % target_heading
 
                     # positive is right turn
                     correction = target_heading - actual_heading
-
-                    #print "  correction1 %.2f" % correction
 
                     # correct for small differences around +/-180:
                     if abs(correction) > 180.0:
                         if correction > 0.0: correction -= 360.0
                         else: correction += 360.0
 
-                    print "       correction %.2f" % correction
-
                     ctl.set_steering(correction * fudge)
 
-                    print "  elapsed time %.2f" % (time.time() - start_tenth)
+                    processing_time = time.time() - start_tenth
 
-                    time.sleep(0.1)
-                print "total time", time.time() - start
+                    print "%6.1f %6.1f %5.3f" % \
+                            (actual_heading, correction, processing_time)
+
+                    iterations += 1
+                    time.sleep(0.1 - processing_time)
+                total_time = time.time() - start
+                print "total time", total_time, \
+                      "iterations", iterations, \
+                      "time/iteration", total_time / iterations
 
             finally:
                 # Stop!
@@ -125,9 +128,9 @@ def run(power_level=30, duration=20, fudge=10.0):
 
 def usage():
     print >> sys.stderr, \
-          "usage: follow.py [power_level [duration [steering_fudge]]]"
+          "usage: follow.py [power_level1 [power_level2 [duration [steering_fudge]]]]"
     print >> sys.stderr, \
-          "       defaults: 30 20 10.0"
+          "       defaults: 30 20 20 10.0"
     sys.exit(2)
 
 if __name__ == "__main__":
