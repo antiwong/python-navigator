@@ -122,7 +122,7 @@ class pololu(object):
         self.power_level = level
 
     def set_steering(self, direction):
-        self.write_servo(4, -direction)
+        self.write_servo(4, -direction - 12)
         self.direction = direction
 
     def set_range_finder(self, rf_direction):

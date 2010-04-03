@@ -71,7 +71,7 @@ class compass(object):
                / sum(self.scale_factors[:self.maxlen])
         return ans
 
-def run(power_level1=30, power_level2=20, duration=20, fudge=10.0):
+def run(power_level1=30, power_level2=25, duration=20, fudge=10.0):
     # power_level 25 doesn't go, 30 does.
     with control.pololu(timeout=1) as ctl:
         cp = compass(ctl)
@@ -86,17 +86,23 @@ def run(power_level1=30, power_level2=20, duration=20, fudge=10.0):
 
             # Go!
             try:
+                power_levels = power_level1, power_level2
                 ctl.set_power(power_level1)
-                time.sleep(1.0)
+                time.sleep(0.5)
                 ctl.set_power(power_level2)
                 start = time.time()
                 iterations = 0
 
+                print "obstacle_dist actual_heading correction " \
+                      "processing_time"
                 while time.time() - start < duration:
+                    ctl.set_power(power_levels[iterations & 1])
                     start_tenth = time.time()
                     obstacle_dist = ctl.read_distance()
                     actual_heading = cp.read()
                     target_heading = g.read()
+                    if target_heading == 1000.0:
+                        break
 
                     # positive is right turn
                     correction = target_heading - actual_heading
@@ -110,11 +116,13 @@ def run(power_level1=30, power_level2=20, duration=20, fudge=10.0):
 
                     processing_time = time.time() - start_tenth
 
-                    print "%6.1f %6.1f %5.3f" % \
-                            (actual_heading, correction, processing_time)
+                    print "%6.1f %6.1f %6.1f %5.3f" % \
+                            (obstacle_dist, actual_heading, correction,
+                             processing_time)
 
                     iterations += 1
-                    time.sleep(0.1 - processing_time)
+                    time_left = 0.1 - processing_time
+                    if time_left > 0.0: time.sleep(time_left)
                 total_time = time.time() - start
                 print "total time", total_time, \
                       "iterations", iterations, \
@@ -134,5 +142,5 @@ def usage():
     sys.exit(2)
 
 if __name__ == "__main__":
-    if len(sys.argv) > 4 or sys.argv[1].startswith(('-h', '--h')): usage()
+    if len(sys.argv) > 5 or sys.argv[1].startswith(('-h', '--h')): usage()
     run(*(float(arg) for arg in sys.argv[1:]))
