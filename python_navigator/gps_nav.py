@@ -15,7 +15,7 @@ Output_filename = '/tmp/gps_direction.out'
 
 Earth_radius = 6371000
 
-def run(filename='/tmp/gps_waypoints', variation=2):
+def run(filename='/tmp/gps_waypoints', variation=2, threshold=5):
     r'''
 
     variation > 0 for W, < 0 for E.
@@ -26,10 +26,11 @@ def run(filename='/tmp/gps_waypoints', variation=2):
                 for waypoint in waypoints:
                     latitude, longitude = (float(x) for x in waypoint.split())
                     navigate_to(latitude, longitude, session, outfile,
-                                variation)
+                                variation, threshold)
                 outfile.write("1000.0\n")       # signal to stop
 
-def navigate_to(target_lat, target_long, session, outfile, variation):
+def navigate_to(target_lat, target_long, session, outfile, variation,
+                threshold):
     # Radius of the circle of longitude at the target latitude.
     long_radius = Earth_radius * math.cos(math.radians(target_lat))
     #print "long_radius", long_radius
@@ -49,6 +50,8 @@ def navigate_to(target_lat, target_long, session, outfile, variation):
         #print 'east', east
         #print 'angle, true', angle_true
         #print 'angle, magnetic', angle_magnetic
+
+        if max(abs(north), abs(east)) < threshold: break
 
         print >> outfile, lat, long, long_radius, \
                           north, east, angle_true, angle_magnetic
@@ -72,16 +75,18 @@ def calc_angle(target_lat, target_long, variation, long_radius, lat, long):
 
 def usage():
     print >> sys.stderr, \
-          "usage: gps_nav.py [waypoint_filename [variation]]"
+          "usage: gps_nav.py [waypoint_filename [variation [threshold]]]"
     print >> sys.stderr, \
           "       variation is > 0 for W, < 0 for E"
     print >> sys.stderr, \
-          "       defaults: /tmp/gps_waypoints 2"
+          "       defaults: /tmp/gps_waypoints 2 5"
     sys.exit(2)
 
 if __name__ == "__main__":
-    if len(sys.argv) > 3 or sys.argv[1].startswith(('-h', '--h')): usage()
-    if len(sys.argv) == 3:
+    if len(sys.argv) > 4 or sys.argv[1].startswith(('-h', '--h')): usage()
+    if len(sys.argv) == 4:
+        run(sys.argv[1], float(sys.argv[2]), float(sys.argv[3]))
+    elif len(sys.argv) == 3:
         run(sys.argv[1], float(sys.argv[2]))
     elif len(sys.argv) == 2:
         run(sys.argv[1])

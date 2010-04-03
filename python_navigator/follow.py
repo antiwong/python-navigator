@@ -71,7 +71,7 @@ class compass(object):
                / sum(self.scale_factors[:self.maxlen])
         return ans
 
-def run(power_level1=30, power_level2=25, duration=20, fudge=10.0):
+def run(power_level1=30, power_level2=25, duration=20, fudge=5.0):
     # power_level 25 doesn't go, 30 does.
     with control.pololu(timeout=1) as ctl:
         cp = compass(ctl)
@@ -138,7 +138,7 @@ def usage():
     print >> sys.stderr, \
           "usage: follow.py [power_level1 [power_level2 [duration [steering_fudge]]]]"
     print >> sys.stderr, \
-          "       defaults: 30 20 20 10.0"
+          "       defaults: 30 20 20 5.0"
     sys.exit(2)
 
 if __name__ == "__main__":
