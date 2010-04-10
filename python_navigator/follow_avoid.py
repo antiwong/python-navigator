@@ -11,7 +11,7 @@ import stat
 import time
 import control
 
-Input_filename = '/var/nav/gps_direction.out'
+Input_filename = '/tmp/gps_direction.out'
 
 class gps(object):
     r'''A context manager to read the target heading from the gps file.
@@ -107,7 +107,6 @@ def run(power_level1=30, power_level2=25, duration=20, fudge=5.0):
                     actual_heading = cp.read()
                     target_heading = g.read()
                     if target_heading == 1000.0:
-                        print "Got stop from gps_nav.py"
                         break
 
                     # positive is right turn
@@ -203,7 +202,5 @@ def usage():
     sys.exit(2)
 
 if __name__ == "__main__":
-    if len(sys.argv) > 5 or \
-       len(sys.argv) > 1 and sys.argv[1].startswith(('-h', '--h')):
-        usage()
+    if len(sys.argv) > 5 or sys.argv[1].startswith(('-h', '--h')): usage()
     run(*(float(arg) for arg in sys.argv[1:]))
