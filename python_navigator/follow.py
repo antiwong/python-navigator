@@ -9,9 +9,14 @@ import sys
 import os
 import stat
 import time
+import logging, logging.config
 import control
 
 Input_filename = '/var/nav/gps_direction.out'
+
+# Set up logging:
+logging.config.fileConfig('/var/nav/logging.conf')
+Logger = logging.getLogger('follow')
 
 class gps(object):
     r'''A context manager to read the target heading from the gps file.
@@ -63,7 +68,7 @@ class compass(object):
 
     def read(self):
         compass = self.ctl.read_compass()
-        print "compass: %.2f" % compass
+        Logger.debug("compass %.2f", compass)
         self.queue.insert(0, compass)
         if len(self.queue) > self.maxlen: del self.queue[self.maxlen:]
         ans = sum((fudge * data)
@@ -71,74 +76,85 @@ class compass(object):
                / sum(self.scale_factors[:self.maxlen])
         return ans
 
-def run(power_level1=30, power_level2=25, duration=20, fudge=5.0):
+def run(duration=20, power_level1=30, power_level2=25, fudge=5.0):
     # power_level 25 doesn't go, 30 does.
-    with control.pololu(timeout=1) as ctl:
-        cp = compass(ctl)
-        with gps() as g:
-            # wait for first heading:
-            while g.read() is None: pass
+    try:
+        Logger.info("start: duration %d, power_level1 %d, power_level2 %d, " \
+                    "steering fudge %.1f",
+                    duration, power_level1, power_level2, fudge)
+        with control.pololu(timeout=1) as ctl:
+            cp = compass(ctl)
+            with gps() as g:
+                # wait for first heading:
+                while g.read() is None: pass
 
-            # preload compass values to get averaging going...
-            for i in range(cp.maxlen):
-                cp.read()
-                time.sleep(0.1)
+                # preload compass values to get averaging going...
+                for i in range(cp.maxlen):
+                    cp.read()
+                    time.sleep(0.1)
 
-            # Go!
-            try:
-                power_levels = power_level1, power_level2
-                ctl.set_power(power_level1)
-                time.sleep(0.5)
-                ctl.set_power(power_level2)
-                start = time.time()
-                iterations = 0
+                # Go!
+                try:
+                    Logger.info("starting vehicle!")
+                    power_levels = power_level1, power_level2
+                    ctl.set_power(power_level1)
+                    time.sleep(0.5)
+                    ctl.set_power(power_level2)
+                    start = time.time()
+                    iterations = 0
 
-                print "obstacle_dist actual_heading correction " \
-                      "processing_time"
-                while time.time() - start < duration:
-                    ctl.set_power(power_levels[iterations & 1])
-                    start_tenth = time.time()
-                    obstacle_dist = ctl.read_distance()
+                    #print "obstacle_dist actual_heading correction " \
+                    #      "processing_time"
+                    while time.time() - start < duration:
+                        ctl.set_power(power_levels[iterations & 1])
+                        start_tenth = time.time()
+                        obstacle_dist = ctl.read_distance()
 
-                    #close obstacle detection
-                    if obstacle_dist > 200
-                        wall_follow(1,200)
+                        #close obstacle detection
+                        if obstacle_dist > 200
+                            wall_follow(1,200)
 
-                    actual_heading = cp.read()
-                    target_heading = g.read()
-                    if target_heading == 1000.0:
-                        print "Got stop from gps_nav.py"
-                        break
+                        actual_heading = cp.read()
+                        target_heading = g.read()
+                        if target_heading == 1000.0:
+                            Logger.info("got STOP from gps_nav.py")
+                            break
 
-                    # positive is right turn
-                    correction = target_heading - actual_heading
+                        # positive is right turn
+                        correction = target_heading - actual_heading
 
-                    # correct for small differences around +/-180:
-                    if abs(correction) > 180.0:
-                        if correction > 0.0: correction -= 360.0
-                        else: correction += 360.0
+                        # correct for small differences around +/-180:
+                        if abs(correction) > 180.0:
+                            if correction > 0.0: correction -= 360.0
+                            else: correction += 360.0
 
-                    ctl.set_steering(correction * fudge)
+                        ctl.set_steering(correction * fudge)
 
-                    processing_time = time.time() - start_tenth
+                        processing_time = time.time() - start_tenth
 
-                    print "%6.1f %6.1f %6.1f %5.3f" % \
-                            (obstacle_dist, actual_heading, correction,
-                             processing_time)
+                        Logger.debug("obstacle_dist %.1f, actual_heading %.1f, "
+                                     "correction %.1f, processing_time %.3f",
+                                     obstacle_dist, actual_heading, correction,
+                                     processing_time)
 
-                    iterations += 1
-                    time_left = 0.1 - processing_time
-                    if time_left > 0.0: time.sleep(time_left)
-                total_time = time.time() - start
-                print "total time", total_time, \
-                      "iterations", iterations, \
-                      "time/iteration", total_time / iterations
+                        iterations += 1
+                        time_left = 0.1 - processing_time
+                        if time_left > 0.0: time.sleep(time_left)
+                    total_time = time.time() - start
+                    Logger.info("done: total time %.2f, iterations %d, "
+                                "msec/iteration %.0f",
+                                total_time, iterations,
+                                (total_time / iterations) * 1000.0)
 
-            finally:
-                # Stop!
-                ctl.set_power(0)
-                time.sleep(1)
-                ctl.set_power(0)
+                finally:
+                    # Stop!
+                    Logger.info("stopping vehicle")
+                    ctl.set_power(0)
+                    time.sleep(1)
+                    ctl.set_power(0)
+    except Exception, e:
+        Logger.exception("%s: %s", e.__class__.__name__, e)
+        raise
 
 def wall_follow(side=0,distance=200)
     #Stop the car, reposition vehicle at specified distance, use ranger/servo to
@@ -197,9 +213,9 @@ def wall_follow(side=0,distance=200)
 
 def usage():
     print >> sys.stderr, \
-          "usage: follow.py [power_level1 [power_level2 [duration [steering_fudge]]]]"
+          "usage: follow.py [duration [power_level1 [power_level2 [steering_fudge]]]]"
     print >> sys.stderr, \
-          "       defaults: 30 20 20 5.0"
+          "       defaults: 20 30 25 5.0"
     sys.exit(2)
 
 if __name__ == "__main__":
