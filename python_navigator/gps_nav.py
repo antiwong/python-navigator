@@ -9,28 +9,41 @@ import time
 import math
 import contextlib
 import logging, logging.config
+import ConfigParser
 import gps
 
 # lat long long_radius north east angle_true angle_magnetic
-Output_filename = '/var/nav/gps_direction.out'
+#Output_filename = '/var/nav/gps_direction.out'
 
 Earth_radius = 6371000
 
+Config = ConfigParser.SafeConfigParser()
+Config.read('/var/nav/nav.conf')
+
 # Set up logging:
-logging.config.fileConfig('/var/nav/logging.conf')
+logging.config.fileConfig(Config.get('gps_nav', 'logging_conf'))
 Logger = logging.getLogger('gps_nav')
 
-def run(filename='/var/nav/gps_waypoints', variation=2, threshold=5):
+def run(filename=None, variation=None, threshold=None):
     r'''
 
     variation > 0 for W, < 0 for E.
     '''
-    Logger.info("started with: %r, variation=%r, threshold=%r",
+    output_filename = Config.get('gps_nav', 'output')
+    if waypoint_filename is None:
+        waypoint_filename = Config.get('gps_nav', 'waypoints')
+    if variation is None:
+        variation = Config.getfloat('gps_nav', 'variation')
+    if threshold is None:
+        threshold = Config.getfloat('gps_nav', 'threshold')
+    Logger.info("started waypoints: %r, outputting to: %r",
+                waypoint_filename, output_filename)
+    Logger.info("variation=%r, threshold=%r",
                 filename, variation, threshold)
     try:
-        with open(filename) as waypoints:
+        with open(waypoint_filename) as waypoints:
             with contextlib.closing(gps.gps()) as session:
-                with open(Output_filename, 'wt', 1) as outfile:
+                with open(output_filename, 'wt', 1) as outfile:
                     for waypoint in waypoints:
                         latitude, longitude = \
                           (float(x) for x in waypoint.split())
@@ -102,8 +115,6 @@ def usage():
           "usage: gps_nav.py [waypoint_filename [variation [threshold]]]"
     print >> sys.stderr, \
           "       variation is > 0 for W, < 0 for E"
-    print >> sys.stderr, \
-          "       defaults: /var/nav/gps_waypoints 2 5"
     sys.exit(2)
 
 if __name__ == "__main__":
