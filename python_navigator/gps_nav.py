@@ -47,7 +47,8 @@ def navigate_to(target_lat, target_long, session, outfile, variation,
                 threshold):
     # Radius of the circle of longitude at the target latitude.
     long_radius = Earth_radius * math.cos(math.radians(target_lat))
-    #print "long_radius", long_radius
+    Logger.debug("Earth_radius %.0f, long_radius %.0f",
+                 Earth_radius, long_radius)
 
     #print >> outfile, "lat, long, long_radius, " \
     #                  "north, east, angle_true, angle_magnetic"
