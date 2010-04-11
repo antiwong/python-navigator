@@ -66,19 +66,23 @@ class compass(object):
     #scale_factors = [5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1]
     scale_factors = [5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0]
 
-    def __init__(self, ctl, maxlen=10):
+    #FIX def __init__(self, ctl, maxlen=10):
+    def __init__(self, ctl, maxlen=6):
         self.ctl = ctl
         self.maxlen = maxlen
         self.queue = []
+        self.sum = sum(self.scale_factors[:self.maxlen])
 
     def read(self):
         compass = self.ctl.read_compass()
-        Logger.debug("compass %.2f", compass)
         self.queue.insert(0, compass)
         if len(self.queue) > self.maxlen: del self.queue[self.maxlen:]
-        ans = sum((fudge * data)
+        avg = sum((fudge * (data + 360 * self.sum))
                   for fudge, data in zip(self.scale_factors, self.queue)) \
-               / sum(self.scale_factors[:self.maxlen])
+               / self.sum \
+               % 360
+        ans = avg if avg <= 180 else avg - 360
+        Logger.debug("compass %.1f, avg %.1f, ans %.1f", compass, avg, ans)
         return ans
 
 def run(duration=None, power_level1=None, power_level2=None, fudge=None):
@@ -130,12 +134,19 @@ def run(duration=None, power_level1=None, power_level2=None, fudge=None):
                         obstacle_dist = ctl.read_distance()
 
                         # close obstacle detection
-                        if not did_wall and obstacle_dist < 500:
+                        #FIX if obstacle_dist < 500:
+                        if obstacle_dist < 300:
+                            if did_wall:
+                                ctl.set_power(0)
+                                Logger.info("2nd obstacle encountered "
+                                            "at distance %d",
+                                            obstacle_dist)
+                                break
                             print >> sys.stderr, "going to wall_following"
                             Logger.info("obstacle encountered at distance %d",
                                         obstacle_dist)
                             wall_follow(cp, ctl, power_levels, start, duration,
-                                        1, 200)
+                                        g, 1, 200)
                             did_wall = True
 
                         actual_heading = cp.read()
@@ -181,7 +192,8 @@ def run(duration=None, power_level1=None, power_level2=None, fudge=None):
         Logger.exception("%s: %s", e.__class__.__name__, e)
         raise
 
-def wall_follow(cp, ctl, power_levels, start, duration, side=0, distance=200):
+def wall_follow(cp, ctl, power_levels, start, duration, g,
+                side=0, distance=200):
     # Stop the car, reposition vehicle at specified distance, use ranger/servo
     # to determine best way to go around obstacle (if side=0), turn the car 90
     # degrees, advance while controlling steering to maintain distance to
@@ -189,7 +201,8 @@ def wall_follow(cp, ctl, power_levels, start, duration, side=0, distance=200):
     # heading.
     done = False
     while not done:     # this loops when inside corners are hit
-        ctl.set_power(-100)
+        #FIX ctl.set_power(-100)
+        ctl.set_power(0)
         time.sleep(1)
         ctl.set_power(0)
         time.sleep(1)
@@ -207,43 +220,60 @@ def wall_follow(cp, ctl, power_levels, start, duration, side=0, distance=200):
             Logger.debug("left_dist %d, right_dist %d, side %d",
                          left_dist, right_dist, side)
         iterations = 0
-        actual_heading = cp.read()
-        half_new_heading = actual_heading + 25 * side
-        new_heading = actual_heading + 70 * side
-        Logger.debug("actual_heading %.0f, half_new_heading %.0f, "
-                     "new_heading %.0f",
-                     actual_heading, half_new_heading, new_heading)
-        ctl.set_steering(-500 * side)
-        time.sleep(0.5)
-        while angle.less(actual_heading * side, half_new_heading * side):
-            ctl.set_power(-2 * power_levels[iterations & 1])
-            iterations += 1
-            time.sleep(0.1)
-            actual_heading = cp.read()
-        Logger.debug("after backing, actual_heading is %.0f", actual_heading)
-        ctl.set_power(0)
-        ctl.set_steering(500 * side)
-        time.sleep(0.5)
-        while angle.less(actual_heading * side, new_heading * side):
-            ctl.set_power(power_levels[iterations & 1])
-            iterations += 1
-            time.sleep(0.1)
-            actual_heading = cp.read()
-        ctl.set_power(0)
-        Logger.debug("after going forward, actual_heading is %.0f",
-                     actual_heading)
+
         ctl.set_range_finder(-500 * side)
+        actual_heading = cp.read()
+        final_heading = actual_heading + 85 * side
+        Logger.debug("actual_heading %.0f, final_heading %.0f",
+                     actual_heading, final_heading)
+        while angle.less(actual_heading * side, final_heading * side):
+            #FIX half_new_heading = actual_heading + 20 * side
+            ctl.set_steering(500 * side)
+            time.sleep(0.5)
+            dist = ctl.read_distance()
+            while angle.less(actual_heading * side, final_heading * side) \
+              and dist > 50:
+                ctl.set_power(power_levels[iterations & 1])
+                iterations += 1
+                time.sleep(0.1)
+                actual_heading = cp.read()
+                dist = ctl.read_distance()
+                Logger.debug("turning forward, actual_heading %.0f, dist %.0f",
+                             actual_heading, dist)
+            ctl.set_power(0)
+            time.sleep(0.5)
+            actual_heading = cp.read()
+            if not angle.less(actual_heading * side, final_heading * side):
+                break
+            half_new_heading = actual_heading + 5 * side
+            Logger.debug("actual_heading %.0f, half_new_heading %.0f",
+                         actual_heading, half_new_heading)
+            ctl.set_steering(-500 * side)
+            time.sleep(0.5)
+            while angle.less(actual_heading * side, half_new_heading * side):
+                ctl.set_power(int(-2.5 * power_levels[iterations & 1]))
+                iterations += 1
+                time.sleep(0.1)
+                actual_heading = cp.read()
+            ctl.set_power(0)
+            time.sleep(0.5)
+            Logger.debug("after backing, actual_heading is %.0f",
+                         actual_heading)
+
+        ctl.set_power(0)
+        Logger.debug("after turning, actual_heading is %.0f", actual_heading)
         ctl.set_steering(-100 * side)
-        time.sleep(2)
+        time.sleep(1)
         # at this point, the car should be with its side facing the wall
         while time.time() - start < duration:
             start_tenth = time.time()
             ctl.set_power(power_levels[iterations & 1])
             side_dist = ctl.read_distance()
-            if side_dist < distance - 20:   # hit corner!
-                Logger.info("wall_following hit corner, side_dist is %d",
-                            side_dist)
-                break
+            #FIX
+            #if side_dist < 50:  # hit corner!
+            #    Logger.info("wall_following hit corner, side_dist is %d",
+            #                side_dist)
+            #    break
             if side_dist < distance - 20:   # too close
                 ctl.set_steering(100 * side)
             elif side_dist > distance + 10: # too far
@@ -251,7 +281,7 @@ def wall_follow(cp, ctl, power_levels, start, duration, side=0, distance=200):
             target_heading = g.read()
             # if car went 20 past target_heading, bail out
             if angle.less(20, (target_heading - actual_heading) * side):
-                Logger.info("wall_following done, actual_heading %.0f"
+                Logger.info("wall_following done, actual_heading %.0f, "
                             "target_heading %.0f",
                             actual_heading, target_heading)
                 done = True

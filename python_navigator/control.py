@@ -6,6 +6,8 @@ import math
 Compass_N_midpoint = 575
 Compass_E_midpoint = 575
 
+class TimeOut(StandardError): pass
+
 class pololu(object):
     def __init__(self, device='/dev/ttyS3', baud=9600, timeout=0, rtscts=0,
                        debug=False):
@@ -109,11 +111,12 @@ class pololu(object):
         self.write(0x90, port)
         data = self.ser.read(2)
         if len(data) != 2:
-            print "port", port, "short read, wanted 2 bytes, got", len(data), \
-                  "bytes"
-            if len(data) == 1:
-                return ord(data[0])
-            return 0
+            raise TimeOut("port %d, got %d bytes" % (port, len(data)))
+            #print "port", port, "short read, wanted 2 bytes, got", len(data), \
+            #      "bytes"
+            #if len(data) == 1:
+            #    return ord(data[0])
+            #return 0
         #while len(data) < 2: data += self.ser.read(2 - len(data))
         return ord(data[0]) + (ord(data[1]) << 8)
 
