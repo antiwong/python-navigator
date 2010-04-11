@@ -7,6 +7,7 @@ from __future__ import division
 
 import sys
 import time
+import os
 import ConfigParser
 import logging, logging.config
 import control
@@ -25,24 +26,29 @@ def run():
     try:
         delay = Config.getfloat('power', 'delay')
         Logger.info("start: delay %.3f", delay)
-        power_level1 = None
 
         with control.pololu(timeout=1) as ctl:
+            if not os.exists(Input_filename):
+                open(Input_filename, 'w').close()
             with open(Input_filename) as input:
-                while True:
+                line = None
+                # read to EOF:
+                for line in input.readline(): pass
+                # wait for first line:
+                while not line:
+                    time.sleep(0.2)
                     line = input.readline()
+                while True:
                     if line:
                         power_level1, power_level2 = \
                           (int(x) for x in line.split())
                         Logger.info("power_level1 %d, power_level2 %d",
                                     power_level1, power_level2)
-                    if power_level1 is None:
-                        time.sleep(0.2)
-                    else:
-                        time.sleep(delay)
-                        ctl.set_power(power_level1)
-                        time.sleep(delay)
-                        ctl.set_power(power_level2)
+                    time.sleep(delay)
+                    ctl.set_power(power_level1)
+                    time.sleep(delay)
+                    ctl.set_power(power_level2)
+                    line = input.readline()
 
     except Exception, e:
         print >> sys.stderr, "got exception"

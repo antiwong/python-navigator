@@ -237,6 +237,7 @@ def wall_follow(cp, ctl, power_levels, start, duration, side=0, distance=200):
         time.sleep(2)
         # at this point, the car should be with its side facing the wall
         while time.time() - start < duration:
+            start_tenth = time.time()
             ctl.set_power(power_levels[iterations & 1])
             side_dist = ctl.read_distance()
             if side_dist < distance - 20:   # hit corner!
@@ -256,7 +257,8 @@ def wall_follow(cp, ctl, power_levels, start, duration, side=0, distance=200):
                 done = True
                 break
             iterations += 1
-            time.sleep(0.1)
+            time_left = 0.1 - (time.time() - start_tenth)
+            if time_left > 0.0: time.sleep(time_left)
             actual_heading = cp.read()
         else:
             Logger.info("wall_following timed out, actual_heading is %.0f",
