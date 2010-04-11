@@ -146,7 +146,7 @@ def run(duration=None, power_level1=None, power_level2=None, fudge=None):
                             Logger.info("obstacle encountered at distance %d",
                                         obstacle_dist)
                             wall_follow(cp, ctl, power_levels, start, duration,
-                                        g, 1, 200)
+                                        g, 1, 300)
                             did_wall = True
 
                         actual_heading = cp.read()
